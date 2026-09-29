@@ -2,36 +2,59 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "8080:80"
+      - "8081:80"
     networks:
       - app-network
+    restart: unless-stopped
     depends_on:
       - backend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   backend:
     build: ./backend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3002:3000"
     environment:
       - DB_HOST=database
-      - DB_USER=root
-      - DB_PASSWORD=example
+      - DB_USER=appuser
+      - DB_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - app-data:/app/data
     networks:
       - app-network
+    restart: unless-stopped
     depends_on:
-      - database
+      database:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   database:
-    image: mysql:8
+    image: mysql:8.4
     environment:
-      - MYSQL_ROOT_PASSWORD=example
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=appdb
+      - MYSQL_USER=appuser
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
     networks:
       - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 networks:
   app-network:
